@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import time
 import requests
 import time
 from bs4 import BeautifulSoup
 import json
 import os
 import urllib.parse
-#import sys
 
 hostName = "localhost"
 serverPort = 8080
