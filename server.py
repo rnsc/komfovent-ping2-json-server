@@ -27,11 +27,11 @@ class ServerHandler(BaseHTTPRequestHandler):
     qs=""
     response = {
       "speed": 45,
-      "power": "on"
+      "active": "on"
     }
     response["speed"] = ServerHandler.get_fan_speed()
-    response["power"] = ServerHandler.get_power_state()
-    if response["speed"] == False or response["power"] == False:
+    response["active"] = ServerHandler.get_power_state()
+    if response["speed"] == False or response["active"] == False:
       response_code = 503
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
@@ -54,12 +54,12 @@ class ServerHandler(BaseHTTPRequestHandler):
           response_code = 503
         else:
           response['speed'] = ret_fan_speed
-      if 'power' in json_payload:
-        ret_power_state = ServerHandler.set_power_state(json_payload['power'])
+      if 'active' in json_payload:
+        ret_power_state = ServerHandler.set_power_state(json_payload['active'])
         if ret_power_state == False:
           response_code = 503
         else:
-          response["power"] = ret_power_state
+          response["active"] = ret_power_state
 
       self.send_response(response_code)
       self.send_header("Content-Type", "application/json")
