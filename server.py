@@ -2,30 +2,28 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
-import time
 from bs4 import BeautifulSoup
 import json
 import os
 import urllib.parse
 
-hostName = "localhost"
-serverPort = 8080
+hostName = os.environ['SERVER_HOSTNAME'] or "0.0.0.0"
+serverPort = int(os.environ['SERVER_PORT']) or 8080
 
 # The base URL of the PING2
 PING2_URL = os.environ['PING2_URL'] or 'http://localhost'
 
 # The username and password
 USERNAME = os.environ['PING2_USERNAME'] or 'user'
-PASSWORD = os.environ['PING2_PASSWORD'] or 'user'
+PASSWORD = os.environ['PING2_PASSWORD'] or 'password'
 
 DOMEKT_MODE2_IN = "0011"
 DOMEKT_MODE2_EX = "0012"
 
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
-    self.send_response(200)
-    self.send_header("Content-Type", "application/json")
-    self.end_headers()
+    response_code = 200
+    
     qs=""
     response = {
       "speed": 45,
@@ -33,6 +31,11 @@ class ServerHandler(BaseHTTPRequestHandler):
     }
     response["speed"] = ServerHandler.get_fan_speed()
     response["power"] = ServerHandler.get_power_state()
+    if response["speed"] == False or response["power"] == False:
+      response_code = 503
+    self.send_response(response_code)
+    self.send_header("Content-Type", "application/json")
+    self.end_headers()
     self.wfile.write(bytes(json.dumps(response), "utf-8"))
 
   def do_PUT(self):
@@ -69,40 +72,55 @@ class ServerHandler(BaseHTTPRequestHandler):
     self.wfile.write(bytes(json.dumps(response), "utf-8"))
 
   def get_power_state():
-    response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
-    soup = BeautifulSoup(response.text, 'html.parser')
-    state = soup.find("td", {"id": "mod"}).text.rstrip()
-    if state == 'Off':
-      return 'off'
-    else:
-      return 'on'
+    try:
+      response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
+      soup = BeautifulSoup(response.text, 'html.parser')
+      state = soup.find("td", {"id": "mod"}).text.rstrip()
+      if state == 'Off':
+        return 'off'
+      else:
+        return 'on'
+    except:
+      return False
 
   def set_power_state(new_state):
-      current_state = ServerHandler.get_power_state()
-      if (current_state == new_state):
-        print("Power is already set to", new_state, ", not doing anything.")
-        return True
-      else:
+    current_state = ServerHandler.get_power_state()
+    if current_state == False:
+      return False
+
+    if (current_state == new_state):
+      print("Power is already set to", new_state, ", not doing anything.")
+      return True
+    else:
+      try:
         r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
         if r.status_code == 200:
           return new_state
         else:
           return False
+      except:
+        return False
 
   # Function to get the speed of the fan
   def get_fan_speed():
+    try:
       response = requests.post(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = soup.find('input', attrs={'name': '0011'})['value'].rstrip()
 
       return current_speed
+    except:
+      return False
 
   def set_fan_speed(speed):
+    try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
         return ServerHandler.get_fan_speed()
       else:
         return False
+    except:
+      return False
 
   def parse_QS(path):
     url_parts = urllib.parse.urlparse(path)

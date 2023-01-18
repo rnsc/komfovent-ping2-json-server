@@ -1,0 +1,10 @@
+---
+version: "3"
+services:
+  komfovent-ping2-json-server:
+    build: .
+    container_name: komfovent-ping2-json-server
+    ports:
+      - 8080:8080
+    env_file: .env
+    restart: unless-stopped
