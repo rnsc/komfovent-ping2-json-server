@@ -49,7 +49,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
       if 'speed' in json_payload:
         ret_fan_speed = ServerHandler.set_fan_speed(json_payload['speed'])
-        response['speed'] = ret_fan_speed
+        response['speed'] = int(ret_fan_speed)
       if 'active' in json_payload:
         ret_power_state = ServerHandler.set_power_state(json_payload['active'])
         response["active"] = ret_power_state
@@ -99,7 +99,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     try:
       response = requests.post(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
-      current_speed = soup.find('input', attrs={'name': '0011'})['value'].rstrip()
+      current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
 
       return current_speed
     except:
@@ -109,7 +109,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
-        return speed
+        return int(speed)
       else:
         return ServerHandler.get_fan_speed()
     except:
