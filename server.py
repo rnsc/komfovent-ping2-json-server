@@ -83,16 +83,16 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     if (current_state == new_state):
       print("Power is already set to", new_state, ", not doing anything.")
-      return True
+      return new_state
     else:
       try:
         r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
         if r.status_code == 200:
           return new_state
         else:
-          return False
+          return current_state
       except:
-        return False
+        return current_state
 
   # Function to get the speed of the fan
   def get_fan_speed():
@@ -109,11 +109,11 @@ class ServerHandler(BaseHTTPRequestHandler):
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
-        return ServerHandler.get_fan_speed()
+        return speed
       else:
-        return False
+        return ServerHandler.get_fan_speed()
     except:
-      return False
+      return ServerHandler.get_fan_speed()
 
   def parse_QS(path):
     url_parts = urllib.parse.urlparse(path)
