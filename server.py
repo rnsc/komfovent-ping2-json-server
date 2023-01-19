@@ -27,7 +27,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     qs=""
     response = {
       "speed": 45,
-      "active": "on"
+      "active": 1
     }
     response["speed"] = ServerHandler.get_fan_speed()
     response["active"] = ServerHandler.get_power_state()
@@ -77,9 +77,9 @@ class ServerHandler(BaseHTTPRequestHandler):
       soup = BeautifulSoup(response.text, 'html.parser')
       state = soup.find("td", {"id": "mod"}).text.rstrip()
       if state == 'Off':
-        return 'off'
+        return 0
       else:
-        return 'on'
+        return 1
     except:
       return False
 
