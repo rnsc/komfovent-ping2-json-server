@@ -23,7 +23,7 @@ DOMEKT_MODE2_EX = "0012"
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
     response_code = 200
-    
+
     qs=""
     response = {
       "speed": 45,
@@ -78,7 +78,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
   def set_power_state(new_state):
     current_state = ServerHandler.get_power_state()
-    if current_state == False:
+    if type(current_state) == bool and current_state == False:
       return False
 
     if (current_state == new_state):
@@ -123,7 +123,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     return query_parts
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
   print("Server started http://%s:%s" % (hostName, serverPort))
 
