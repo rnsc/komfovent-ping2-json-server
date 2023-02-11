@@ -73,17 +73,12 @@ class ServerHandler(BaseHTTPRequestHandler):
       json_payload = json.loads(payload)
       response_code = 200
 
-      state_file = KomfoventStatus.read_state_file()
-      if (int(time.time()) - int(state_file['time'])) > POLLING:
-        if 'speed' in json_payload:
-          ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
-          response['speed'] = int(ret_fan_speed)
-        if 'active' in json_payload:
-          ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
-          response["active"] = ret_power_state
-      else:
-        response["speed"] = state_file['speed']
-        response["active"] = state_file['active']
+      if 'speed' in json_payload:
+        ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
+        response['speed'] = int(ret_fan_speed)
+      if 'active' in json_payload:
+        ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
+        response["active"] = ret_power_state
 
       self.send_response(response_code)
       self.send_header("Content-Type", "application/json")
