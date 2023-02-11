@@ -170,7 +170,7 @@ def read_state_file():
   return data
 
 if __name__ == "__main__":
-  handler = ServerHandler()
+  handler = ServerHandler(None)
   polling_thread = threading.Thread(target=schedule_polling, args=(handler,))
   polling_thread.start()
 
