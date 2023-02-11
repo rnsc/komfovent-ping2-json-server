@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 import json
 import os
 import urllib.parse
+import time
+import threading
 
 hostName = os.environ['SERVER_HOSTNAME'] or "0.0.0.0"
 serverPort = int(os.environ['SERVER_PORT']) or 8080
@@ -19,6 +21,8 @@ PASSWORD = os.environ['PING2_PASSWORD'] or 'password'
 
 DOMEKT_MODE2_IN = "0011"
 DOMEKT_MODE2_EX = "0012"
+
+POLLING = 120
 
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
@@ -69,12 +73,13 @@ class ServerHandler(BaseHTTPRequestHandler):
       response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       state = soup.find("td", {"id": "mod"}).text.rstrip()
+      active = 1
       if state == 'Off':
-        return 0
-      else:
-        return 1
+        active = 0
+      updated_state_file({'active': active})
+      return active
     except:
-      return False
+      return int(read_state_file()['active'])
 
   def set_power_state(new_state):
     current_state = ServerHandler.get_power_state()
@@ -88,6 +93,7 @@ class ServerHandler(BaseHTTPRequestHandler):
       try:
         r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
         if r.status_code == 200:
+          updated_state_file({'active': new_state})
           return new_state
         else:
           return current_state
@@ -97,23 +103,24 @@ class ServerHandler(BaseHTTPRequestHandler):
   # Function to get the speed of the fan
   def get_fan_speed():
     try:
-      response = requests.post(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
+      response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
-
+      updated_state_file({'speed': current_speed})
       return current_speed
     except:
-      return False
+      return int(read_state_file()['speed'])
 
   def set_fan_speed(speed):
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
         return int(speed)
+        updated_state_file({'speed': current_speed})
       else:
-        return ServerHandler.get_fan_speed()
+        return int(read_state_file()['speed']) 
     except:
-      return ServerHandler.get_fan_speed()
+      return int(read_state_file()['speed'])
 
   def parse_QS(path):
     url_parts = urllib.parse.urlparse(path)
@@ -123,7 +130,18 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     return query_parts
 
-if __name__ == "__main__":
+def schedule_polling(handler):
+  schedule.every(POLLING).seconds.do(poll, handler)
+  while True:
+    schedule.run_pending()
+    time.sleep(1)
+
+def poll(handler):
+  handler.power_state = handler.get_power_state()
+  handler.fan_speed = handler.get_fan_speed()
+  
+
+def run_httpserver():
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
   print("Server started http://%s:%s" % (hostName, serverPort))
 
@@ -134,3 +152,26 @@ if __name__ == "__main__":
 
   webServer.server_close()
   print("Server stopped.")
+
+def update_state_file(payload):
+  data = {}
+  with open(STATE_FILE_PATH, "r") as rf:
+    data = json.load(rf)
+
+  data = data | payload
+  with open(STATE_FILE_PATH, "w") as wf:
+    f.write(json.dumps(data))
+
+def read_state_file():
+  data = {}
+  with open(STATE_FILE_PATH, "r") as rf:
+    data = json.load(rf)
+
+  return data
+
+if __name__ == "__main__":
+  handler = ServerHandler()
+  polling_thread = threading.Thread(target=schedule_polling, args=(handler,))
+  polling_thread.start()
+
+  run_httpserver()
