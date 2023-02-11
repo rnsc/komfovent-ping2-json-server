@@ -44,7 +44,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     }
 
     state_file = KomfoventStatus.read_state_file()
-    if int(state_file) - int(time.time()) > 60:
+    if int(state_file['time']) - int(time.time()) > 60:
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_power_state()
     else:
@@ -67,7 +67,7 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       state_file = KomfoventStatus.read_state_file()
-      if int(state_file) - int(time.time()) > 60:
+      if int(state_file['time']) - int(time.time()) > 60:
         if 'speed' in json_payload:
           ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
           response['speed'] = int(ret_fan_speed)
