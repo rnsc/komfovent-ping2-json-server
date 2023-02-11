@@ -30,7 +30,7 @@ STATE_FILE_PATH = '/tmp/komfoventstatus.json'
 DEFAULT_DATA = {
   'speed': 45,
   'active': 1,
-  'time': int(time()-60)
+  'time': int(time())-60
 }
 
 class ServerHandler(BaseHTTPRequestHandler):
