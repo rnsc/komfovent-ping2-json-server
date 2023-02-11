@@ -164,7 +164,7 @@ class KomfoventStatus():
 
   def update_state_file(payload):
     print("update_state_file")
-    data = { 'time': int(time.time()) }
+    data = { }
     try:
       with open(STATE_FILE_PATH, "r") as rf:
         print("update_state_file - Reading state file before update")
@@ -173,7 +173,7 @@ class KomfoventStatus():
       data = DEFAULT_DATA
       print("update_state_file - Couldn't open the file to read")
     print("updating payload")
-    data = data | payload
+    data = data | payload | { 'time': int(time.time()) }
     with open(STATE_FILE_PATH, "w") as wf:
       print("update_state_file - updating state file")
       wf.write(json.dumps(data))
