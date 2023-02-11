@@ -25,12 +25,12 @@ DOMEKT_MODE2_EX = "0012"
 
 POLLING = 120
 
-STATE_FILE_PATH = '/tmp/komfoventstatus.json'
+STATE_FILE_PATH = os.environ['STATE_FILE_PATH'] or '/tmp/komfoventstatus.json'
 
 DEFAULT_DATA = {
   'speed': 45,
   'active': 1,
-  'time': int(time.time()-60)
+  'time': int(time.time())-POLLING-1
 }
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -44,7 +44,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     }
 
     state_file = KomfoventStatus.read_state_file()
-    if int(state_file['time']) - int(time.time()) > 60:
+    if int(time.time()) - int(state_file['time']) > POLLING:
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_power_state()
     else:
@@ -67,7 +67,7 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       state_file = KomfoventStatus.read_state_file()
-      if int(state_file['time']) - int(time.time()) > 60:
+      if int(time.time()) - int(state_file['time']) > POLLING:
         if 'speed' in json_payload:
           ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
           response['speed'] = int(ret_fan_speed)
@@ -90,6 +90,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
 class KomfoventStatus():
   def get_power_state():
+    print("get_power_state")
     try:
       response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
@@ -103,6 +104,7 @@ class KomfoventStatus():
       return int(KomfoventStatus.read_state_file()['active'])
 
   def set_power_state(new_state):
+    print("set_power_state")
     current_state = ServerHandler.get_power_state()
     if type(current_state) == bool and current_state == False:
       return False
@@ -123,6 +125,7 @@ class KomfoventStatus():
 
   # Function to get the speed of the fan
   def get_fan_speed():
+    print("get_fan_speed")
     try:
       response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
@@ -133,6 +136,7 @@ class KomfoventStatus():
       return int(KomfoventStatus.read_state_file()['speed'])
 
   def set_fan_speed(speed):
+    print("set_fan_speed")
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
@@ -152,38 +156,45 @@ class KomfoventStatus():
     return query_parts
 
   def update_state_file(payload):
-    data = { 'time': int(time()) }
+    print("update_state_file")
+    data = { 'time': int(time.time()) }
     try:
       with open(STATE_FILE_PATH, "r") as rf:
+        print("update_state_file - Reading state file before update")
         data = json.load(rf)
     except:
       data = DEFAULT_DATA
-      print("Couldn't open the file to read")
-
+      print("update_state_file - Couldn't open the file to read")
+    print("updating payload")
     data = data | payload
     with open(STATE_FILE_PATH, "w") as wf:
+      print("update_state_file - updating state file")
       wf.write(json.dumps(data))
 
   def read_state_file():
+    print("read_state_file")
     data = {}
     try:
       with open(STATE_FILE_PATH, "r") as rf:
         data = json.load(rf)
     except:
       data = DEFAULT_DATA
-      print("Couldn't open the file to read") 
+      print(json.dumps(data))
+      print("read_state_file - Couldn't open the file to read")
+      print(STATE_FILE_PATH)
 
     return data
 
-def schedule_polling(handler):
-  schedule.every(POLLING).seconds.do(poll, handler)
+def schedule_polling():
+  schedule.every(POLLING).seconds.do(poll)
   while True:
     schedule.run_pending()
     time.sleep(1)
 
-def poll(handler):
-  handler.power_state = handler.get_power_state()
-  handler.fan_speed = handler.get_fan_speed()
+def poll():
+  print("poll")
+  KomfoventStatus.get_power_state()
+  KomfoventStatus.get_fan_speed()
 
 def run_httpserver():
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
@@ -198,8 +209,7 @@ def run_httpserver():
   print("Server stopped.")
 
 if __name__ == "__main__":
-  handler = KomfoventStatus
-  polling_thread = threading.Thread(target=schedule_polling, args=(handler,))
+  polling_thread = threading.Thread(target=schedule_polling)
   polling_thread.start()
 
   run_httpserver()
