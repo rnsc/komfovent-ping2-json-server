@@ -27,6 +27,11 @@ POLLING = 120
 
 STATE_FILE_PATH = '/tmp/komfoventstatus.json'
 
+DEFAULT_DATA = {
+  'speed': 45,
+  'active': 1
+}
+
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
     response_code = 200
@@ -80,7 +85,7 @@ class KomfoventStatus():
       active = 1
       if state == 'Off':
         active = 0
-      KomfoventStatus.updated_state_file({'active': active})
+      KomfoventStatus.update_state_file({'active': active})
       return active
     except:
       return int(KomfoventStatus.read_state_file()['active'])
@@ -97,7 +102,7 @@ class KomfoventStatus():
       try:
         r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
         if r.status_code == 200:
-          KomfoventStatus.updated_state_file({'active': new_state})
+          KomfoventStatus.update_state_file({'active': new_state})
           return new_state
         else:
           return current_state
@@ -110,7 +115,7 @@ class KomfoventStatus():
       response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
-      KomfoventStatus.updated_state_file({'speed': current_speed})
+      KomfoventStatus.update_state_file({'speed': current_speed})
       return current_speed
     except:
       return int(KomfoventStatus.read_state_file()['speed'])
@@ -119,8 +124,8 @@ class KomfoventStatus():
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
+        KomfoventStatus.update_state_file({'speed': speed})
         return int(speed)
-        updated_state_file({'speed': current_speed})
       else:
         return int(KomfoventStatus.read_state_file()['speed']) 
     except:
@@ -136,17 +141,25 @@ class KomfoventStatus():
 
   def update_state_file(payload):
     data = {}
-    with open(STATE_FILE_PATH, "r") as rf:
-      data = json.load(rf)
+    try:
+      with open(STATE_FILE_PATH, "r") as rf:
+        data = json.load(rf)
+    except:
+      data = DEFAULT_DATA
+      print("Couldn't open the file to read")
 
     data = data | payload
     with open(STATE_FILE_PATH, "w") as wf:
-      f.write(json.dumps(data))
+      wf.write(json.dumps(data))
 
   def read_state_file():
     data = {}
-    with open(STATE_FILE_PATH, "r") as rf:
-      data = json.load(rf)
+    try:
+      with open(STATE_FILE_PATH, "r") as rf:
+        data = json.load(rf)
+    except:
+      data = DEFAULT_DATA
+      print("Couldn't open the file to read") 
 
     return data
 
@@ -159,7 +172,6 @@ def schedule_polling(handler):
 def poll(handler):
   handler.power_state = handler.get_power_state()
   handler.fan_speed = handler.get_fan_speed()
-  
 
 def run_httpserver():
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
