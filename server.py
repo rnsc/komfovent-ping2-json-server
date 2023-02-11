@@ -33,8 +33,8 @@ class ServerHandler(BaseHTTPRequestHandler):
       "speed": 45,
       "active": 1
     }
-    response["speed"] = ServerHandler.get_fan_speed()
-    response["active"] = ServerHandler.get_power_state()
+    response["speed"] = KomfoventStatus.get_fan_speed()
+    response["active"] = KomfoventStatus.get_power_state()
 
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
@@ -52,10 +52,10 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       if 'speed' in json_payload:
-        ret_fan_speed = ServerHandler.set_fan_speed(json_payload['speed'])
+        ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
         response['speed'] = int(ret_fan_speed)
       if 'active' in json_payload:
-        ret_power_state = ServerHandler.set_power_state(json_payload['active'])
+        ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
         response["active"] = ret_power_state
 
       self.send_response(response_code)
@@ -68,6 +68,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     self.wfile.write(bytes(json.dumps(response), "utf-8"))
 
+class KomfoventStatus():
   def get_power_state():
     try:
       response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
@@ -170,7 +171,7 @@ def read_state_file():
   return data
 
 if __name__ == "__main__":
-  handler = ServerHandler(None, None, None)
+  handler = KomfoventStatus
   polling_thread = threading.Thread(target=schedule_polling, args=(handler,))
   polling_thread.start()
 
