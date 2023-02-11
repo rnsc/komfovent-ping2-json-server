@@ -29,7 +29,8 @@ STATE_FILE_PATH = '/tmp/komfoventstatus.json'
 
 DEFAULT_DATA = {
   'speed': 45,
-  'active': 1
+  'active': 1,
+  'time': int(time()-60)
 }
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -41,8 +42,14 @@ class ServerHandler(BaseHTTPRequestHandler):
       "speed": 45,
       "active": 1
     }
-    response["speed"] = KomfoventStatus.get_fan_speed()
-    response["active"] = KomfoventStatus.get_power_state()
+
+    state_file = KomfoventStatus.read_state_file()
+    if int(state_file) - int(time()) > 60:
+      response["speed"] = KomfoventStatus.get_fan_speed()
+      response["active"] = KomfoventStatus.get_power_state()
+    else:
+      response["speed"] = state_file['speed']
+      response["active"] = state_file['active']
 
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
@@ -59,12 +66,17 @@ class ServerHandler(BaseHTTPRequestHandler):
       json_payload = json.loads(payload)
       response_code = 200
 
-      if 'speed' in json_payload:
-        ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
-        response['speed'] = int(ret_fan_speed)
-      if 'active' in json_payload:
-        ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
-        response["active"] = ret_power_state
+      state_file = KomfoventStatus.read_state_file()
+      if int(state_file) - int(time()) > 60:
+        if 'speed' in json_payload:
+          ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
+          response['speed'] = int(ret_fan_speed)
+        if 'active' in json_payload:
+          ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
+          response["active"] = ret_power_state
+      else:
+        response["speed"] = state_file['speed']
+        response["active"] = state_file['active']
 
       self.send_response(response_code)
       self.send_header("Content-Type", "application/json")
@@ -140,7 +152,7 @@ class KomfoventStatus():
     return query_parts
 
   def update_state_file(payload):
-    data = {}
+    data = { 'time': int(time()) }
     try:
       with open(STATE_FILE_PATH, "r") as rf:
         data = json.load(rf)
