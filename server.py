@@ -25,6 +25,8 @@ DOMEKT_MODE2_EX = "0012"
 
 POLLING = 120
 
+STATE_FILE_PATH = '/tmp/komfoventstatus.json'
+
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
     response_code = 200
@@ -78,10 +80,10 @@ class KomfoventStatus():
       active = 1
       if state == 'Off':
         active = 0
-      updated_state_file({'active': active})
+      KomfoventStatus.updated_state_file({'active': active})
       return active
     except:
-      return int(read_state_file()['active'])
+      return int(KomfoventStatus.read_state_file()['active'])
 
   def set_power_state(new_state):
     current_state = ServerHandler.get_power_state()
@@ -95,7 +97,7 @@ class KomfoventStatus():
       try:
         r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
         if r.status_code == 200:
-          updated_state_file({'active': new_state})
+          KomfoventStatus.updated_state_file({'active': new_state})
           return new_state
         else:
           return current_state
@@ -108,10 +110,10 @@ class KomfoventStatus():
       response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
-      updated_state_file({'speed': current_speed})
+      KomfoventStatus.updated_state_file({'speed': current_speed})
       return current_speed
     except:
-      return int(read_state_file()['speed'])
+      return int(KomfoventStatus.read_state_file()['speed'])
 
   def set_fan_speed(speed):
     try:
@@ -120,9 +122,9 @@ class KomfoventStatus():
         return int(speed)
         updated_state_file({'speed': current_speed})
       else:
-        return int(read_state_file()['speed']) 
+        return int(KomfoventStatus.read_state_file()['speed']) 
     except:
-      return int(read_state_file()['speed'])
+      return int(KomfoventStatus.read_state_file()['speed'])
 
   def parse_QS(path):
     url_parts = urllib.parse.urlparse(path)
@@ -131,6 +133,22 @@ class KomfoventStatus():
     #print( f"{query_parts=}" )
 
     return query_parts
+
+  def update_state_file(payload):
+    data = {}
+    with open(STATE_FILE_PATH, "r") as rf:
+      data = json.load(rf)
+
+    data = data | payload
+    with open(STATE_FILE_PATH, "w") as wf:
+      f.write(json.dumps(data))
+
+  def read_state_file():
+    data = {}
+    with open(STATE_FILE_PATH, "r") as rf:
+      data = json.load(rf)
+
+    return data
 
 def schedule_polling(handler):
   schedule.every(POLLING).seconds.do(poll, handler)
@@ -154,22 +172,6 @@ def run_httpserver():
 
   webServer.server_close()
   print("Server stopped.")
-
-def update_state_file(payload):
-  data = {}
-  with open(STATE_FILE_PATH, "r") as rf:
-    data = json.load(rf)
-
-  data = data | payload
-  with open(STATE_FILE_PATH, "w") as wf:
-    f.write(json.dumps(data))
-
-def read_state_file():
-  data = {}
-  with open(STATE_FILE_PATH, "r") as rf:
-    data = json.load(rf)
-
-  return data
 
 if __name__ == "__main__":
   handler = KomfoventStatus
