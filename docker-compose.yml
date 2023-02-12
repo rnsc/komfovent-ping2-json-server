@@ -3,7 +3,6 @@ version: "3"
 services:
   komfovent-ping2-json-server:
     build: .
-    command: sleep 600
     container_name: komfovent-ping2-json-server
     ports:
       - 8080:8080
