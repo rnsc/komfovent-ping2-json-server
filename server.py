@@ -49,7 +49,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     state = KomfoventStatus.read_state()
     now = int(time.time())
 
-    if ((now - int(state['time'])) > POLLING) or not state:
+    if not state or ((now - int(state['time'])) > POLLING):
       print("getting fresh info")
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_active_state()
