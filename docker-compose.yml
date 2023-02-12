@@ -2,7 +2,7 @@
 version: "3"
 services:
   komfovent-ping2-json-server:
-    image: rnsc/komfovent-ping2-json-server:lastest
+    image: rnsc/komfovent-ping2-json-server:latest
     container_name: komfovent-ping2-json-server
     ports:
       - 8080:8080
