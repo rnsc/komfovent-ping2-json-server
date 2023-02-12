@@ -3,8 +3,15 @@ version: "3"
 services:
   komfovent-ping2-json-server:
     build: .
+    command: sleep 600
     container_name: komfovent-ping2-json-server
     ports:
       - 8080:8080
     env_file: .env
+    restart: unless-stopped
+  redis-komfovent-status:
+    image: redis/redis-stack:latest
+    container_name: redis-komfovent-status
+    ports:
+      - 6379:6379
     restart: unless-stopped

@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import redis
 import requests
 import schedule
 import threading
@@ -24,8 +25,7 @@ DOMEKT_MODE2_IN = "0011"
 DOMEKT_MODE2_EX = "0012"
 
 POLLING = 120
-
-STATE_FILE_PATH = os.environ['STATE_FILE_PATH'] or '/tmp/komfoventstatus.json'
+SETTINGS_SCHEDULE = 10
 
 DEFAULT_DATA = {
   'speed': 45,
@@ -33,30 +33,34 @@ DEFAULT_DATA = {
   'time': int(time.time())-POLLING-1
 }
 
+REDIS_PORT = os.environ['REDIS_PORT'] or 6379
+REDIS_HOST = os.environ['REDIS_HOST'] or "redis-komfovent-status"
+REDIS_KEY_STATUS = "status"
+REDIS_KEY_SETTINGS_SPEED_LIST = "settings_speed"
+REDIS_KEY_SETTINGS_POWER_LIST = "settings_power"
+R = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+
 class ServerHandler(BaseHTTPRequestHandler):
   def do_GET(self):
     response_code = 200
 
-    qs=""
-    response = {
-      "speed": 45,
-      "active": 1
-    }
+    response = { }
 
-    state_file = KomfoventStatus.read_state_file()
+    state = KomfoventStatus.read_state()
     now = int(time.time())
     print("now:", now)
-    print("state time:", state_file['time'])
+    print(state)
+    print("state time:", state['time'])
     print("POLLING:", POLLING)
-    print("time difference:", now - int(state_file['time']))
-    if (now - int(state_file['time'])) > POLLING:
+    print("time difference:", now - int(state['time']))
+    if (now - int(state['time'])) > POLLING:
       print("getting fresh info")
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_power_state()
     else:
       print("getting info from state file")
-      response["speed"] = state_file['speed']
-      response["active"] = state_file['active']
+      response["speed"] = state['speed']
+      response["active"] = state['active']
 
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
@@ -74,11 +78,11 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       if 'speed' in json_payload:
-        ret_fan_speed = KomfoventStatus.set_fan_speed(json_payload['speed'])
-        response['speed'] = int(ret_fan_speed)
+        R.lpush(REDIS_KEY_SETTINGS_SPEED_LIST, json_payload['speed'])
+        response['speed'] = json_payload['speed']
       if 'active' in json_payload:
-        ret_power_state = KomfoventStatus.set_power_state(json_payload['active'])
-        response["active"] = ret_power_state
+        R.lpush(REDIS_KEY_SETTINGS_POWER_LIST, json_payload['active'])
+        response["active"] = json_payload['active']
 
       self.send_response(response_code)
       self.send_header("Content-Type", "application/json")
@@ -92,7 +96,6 @@ class ServerHandler(BaseHTTPRequestHandler):
 
 class KomfoventStatus():
   def get_power_state():
-    print("get_power_state")
     try:
       response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
@@ -100,54 +103,46 @@ class KomfoventStatus():
       active = 1
       if state == 'Off':
         active = 0
-      KomfoventStatus.update_state_file({'active': active})
+      KomfoventStatus.update_state({'active': active})
       return active
     except:
-      return int(KomfoventStatus.read_state_file()['active'])
+      return int(KomfoventStatus.read_state()['active'])
 
-  def set_power_state(new_state):
-    print("set_power_state")
-    current_state = ServerHandler.get_power_state()
-    if type(current_state) == bool and current_state == False:
-      return False
+  def set_power_state(active):
+    state_active = int(KomfoventStatus.read_state()['active'])
 
-    if (current_state == new_state):
-      print("Power is already set to", new_state, ", not doing anything.")
-      return new_state
-    else:
-      try:
-        r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
-        if r.status_code == 200:
-          KomfoventStatus.update_state_file({'active': new_state})
-          return new_state
-        else:
-          return current_state
-      except:
-        return current_state
+    try:
+      r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
+      if r.status_code == 200:
+        KomfoventStatus.update_state({'active': active})
+        return active
+      else:
+        return state_active
+    except:
+      return state_active
 
   # Function to get the speed of the fan
   def get_fan_speed():
-    print("get_fan_speed")
     try:
       response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
-      KomfoventStatus.update_state_file({'speed': current_speed})
+      KomfoventStatus.update_state({'speed': current_speed})
       return current_speed
     except:
-      return int(KomfoventStatus.read_state_file()['speed'])
+      return int(KomfoventStatus.read_state()['speed'])
 
   def set_fan_speed(speed):
-    print("set_fan_speed")
+    state_speed = int(KomfoventStatus.read_state()['speed'])
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
-        KomfoventStatus.update_state_file({'speed': speed})
+        KomfoventStatus.update_state({'speed': speed})
         return int(speed)
       else:
-        return int(KomfoventStatus.read_state_file()['speed']) 
+        return state_speed
     except:
-      return int(KomfoventStatus.read_state_file()['speed'])
+      return state_speed
 
   def parse_QS(path):
     url_parts = urllib.parse.urlparse(path)
@@ -157,46 +152,60 @@ class KomfoventStatus():
 
     return query_parts
 
-  def update_state_file(payload):
-    print("update_state_file")
+  def update_state(payload):
     data = { }
     try:
-      with open(STATE_FILE_PATH, "r") as rf:
-        print("update_state_file - Reading state file before update")
-        data = json.load(rf)
+      data = R.hgetall(REDIS_KEY_STATUS)
     except:
       data = DEFAULT_DATA
-      print("update_state_file - Couldn't open the file to read")
-    print("updating payload")
-    data = data | payload | { 'time': int(time.time()) }
-    with open(STATE_FILE_PATH, "w") as wf:
-      print("update_state_file - updating state file")
-      wf.write(json.dumps(data))
+      print("update_state - Couldn't get hash", REDIS_KEY_STATUS)
 
-  def read_state_file():
-    print("read_state_file")
+    data = data | payload | { 'time': int(time.time()) }
+
+    try:
+      R.hset(REDIS_KEY_STATUS, mapping=data)
+    except:
+      print("update_state - Couldn't update hash", REDIS_KEY_STATUS)
+
+  def read_state():
     data = {}
     try:
-      with open(STATE_FILE_PATH, "r") as rf:
-        data = json.load(rf)
+      data = R.hgetall(REDIS_KEY_STATUS)
+      if not data:
+        data = DEFAULT_DATA
     except:
       data = DEFAULT_DATA
       print(json.dumps(data))
-      print("read_state_file - Couldn't open the file to read")
-      print(STATE_FILE_PATH)
+      print("read_state - Couldn't read ", REDIS_KEY_STATUS)
 
     return data
 
 def schedule_polling():
   schedule.every(POLLING).seconds.do(poll)
+  schedule.every(SETTINGS_SCHEDULE).seconds.do(settings)
   while True:
     schedule.run_pending()
     time.sleep(1)
 
 def poll():
-  print("poll")
   KomfoventStatus.get_power_state()
   KomfoventStatus.get_fan_speed()
+
+def settings():
+  llen_speed = R.llen(REDIS_KEY_SETTINGS_SPEED_LIST)
+  llen_power = R.llen(REDIS_KEY_SETTINGS_POWER_LIST)
+  
+  current_state = KomfoventStatus.read_state()
+
+  if llen_speed > 0 :
+    last_speed = int(R.lpop(REDIS_KEY_SETTINGS_SPEED_LIST, llen_speed)[-1])
+    if last_speed != int(current_state['speed']):
+      KomfoventStatus.set_fan_speed(last_speed)
+
+  if llen_power > 0 :
+    last_power = int(R.lpop(REDIS_KEY_SETTINGS_POWER_LIST, llen_power)[-1])
+    if last_power != int(current_state['power']):
+      KomfoventStatus.set_power_state(last_power)
 
 def run_httpserver():
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
