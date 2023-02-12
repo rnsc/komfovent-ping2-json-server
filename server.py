@@ -49,7 +49,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     state = KomfoventStatus.read_state()
     now = int(time.time())
 
-    if (now - int(state['time'])) > POLLING:
+    if ((now - int(state['time'])) > POLLING) or not state:
       print("getting fresh info")
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_active_state()
@@ -196,14 +196,12 @@ def settings():
   if llen_speed > 0 :
     redis_speed_settings = R.lpop(REDIS_KEY_SETTINGS_SPEED_LIST, llen_speed)
     last_speed = int(redis_speed_settings[-1])
-    print("last_speed: ", last_speed)
     if last_speed != int(current_state['speed']):
       KomfoventStatus.set_fan_speed(last_speed)
 
   if llen_active > 0 :
     redis_active_settings = R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)
     last_active = bool((redis_active_settings[-1]))
-    print("last_active: ", last_active)
     if last_active != bool(current_state['active']):
       KomfoventStatus.set_active_state(last_active)
 
