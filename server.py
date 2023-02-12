@@ -74,10 +74,10 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       if 'speed' in json_payload:
-        R.lpush(REDIS_KEY_SETTINGS_SPEED_LIST, json_payload['speed'])
+        R.lpush(REDIS_KEY_SETTINGS_SPEED_LIST, int(json_payload['speed']))
         response['speed'] = json_payload['speed']
       if 'active' in json_payload:
-        R.lpush(REDIS_KEY_SETTINGS_POWER_LIST, json_payload['active'])
+        R.lpush(REDIS_KEY_SETTINGS_POWER_LIST, int(json_payload['active']))
         response["active"] = json_payload['active']
 
       self.send_response(response_code)
