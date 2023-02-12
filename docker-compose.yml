@@ -9,7 +9,7 @@ services:
     env_file: .env
     restart: unless-stopped
   redis-komfovent-status:
-    image: redis/redis-stack:latest
+    image: redis/redis:alpine
     container_name: redis-komfovent-status
     ports:
       - 6379:6379
