@@ -37,7 +37,7 @@ REDIS_PORT = os.environ['REDIS_PORT'] or 6379
 REDIS_HOST = os.environ['REDIS_HOST'] or "redis-komfovent-status"
 REDIS_KEY_STATUS = "status"
 REDIS_KEY_SETTINGS_SPEED_LIST = "settings_speed"
-REDIS_KEY_SETTINGS_POWER_LIST = "settings_power"
+REDIS_KEY_SETTINGS_ACTIVE_LIST = "settings_active"
 R = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -52,7 +52,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     if (now - int(state['time'])) > POLLING:
       print("getting fresh info")
       response["speed"] = KomfoventStatus.get_fan_speed()
-      response["active"] = KomfoventStatus.get_power_state()
+      response["active"] = KomfoventStatus.get_active_state()
     else:
       print("getting info from state")
       response["speed"] = int(state['speed'])
@@ -77,7 +77,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         R.lpush(REDIS_KEY_SETTINGS_SPEED_LIST, int(json_payload['speed']))
         response['speed'] = json_payload['speed']
       if 'active' in json_payload:
-        R.lpush(REDIS_KEY_SETTINGS_POWER_LIST, int(json_payload['active']))
+        R.lpush(REDIS_KEY_SETTINGS_ACTIVE_LIST, int(json_payload['active']))
         response["active"] = json_payload['active']
 
       self.send_response(response_code)
@@ -91,7 +91,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     self.wfile.write(bytes(json.dumps(response), "utf-8"))
 
 class KomfoventStatus():
-  def get_power_state():
+  def get_active_state():
     try:
       response = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
@@ -104,7 +104,7 @@ class KomfoventStatus():
     except:
       return int(KomfoventStatus.read_state()['active'])
 
-  def set_power_state(active):
+  def set_active_state(active):
     state_active = int(KomfoventStatus.read_state()['active'])
 
     try:
@@ -184,12 +184,12 @@ def schedule_polling():
     time.sleep(1)
 
 def poll():
-  KomfoventStatus.get_power_state()
+  KomfoventStatus.get_active_state()
   KomfoventStatus.get_fan_speed()
 
 def settings():
   llen_speed = R.llen(REDIS_KEY_SETTINGS_SPEED_LIST)
-  llen_power = R.llen(REDIS_KEY_SETTINGS_POWER_LIST)
+  llen_active = R.llen(REDIS_KEY_SETTINGS_ACTIVE_LIST)
   
   current_state = KomfoventStatus.read_state()
 
@@ -198,10 +198,10 @@ def settings():
     if last_speed != int(current_state['speed']):
       KomfoventStatus.set_fan_speed(last_speed)
 
-  if llen_power > 0 :
-    last_power = int(R.lpop(REDIS_KEY_SETTINGS_POWER_LIST, llen_power)[-1])
-    if last_power != int(current_state['power']):
-      KomfoventStatus.set_power_state(last_power)
+  if llen_active > 0 :
+    last_active = int(R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)[-1])
+    if last_active != int(current_state['active']):
+      KomfoventStatus.set_active_state(last_active)
 
 def run_httpserver():
   webServer = HTTPServer((hostName, serverPort), ServerHandler)
