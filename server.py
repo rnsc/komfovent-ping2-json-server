@@ -56,7 +56,7 @@ class ServerHandler(BaseHTTPRequestHandler):
     else:
       print("getting info from state")
       response["speed"] = int(state['speed'])
-      response["active"] = int(state['active'])
+      response["active"] = bool(state['active'])
 
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
@@ -99,18 +99,18 @@ class KomfoventStatus():
       active = 1
       if state == 'Off':
         active = 0
-      KomfoventStatus.update_state({'active': active})
+      KomfoventStatus.update_state({'active': int(active)})
       return active
     except:
-      return int(KomfoventStatus.read_state()['active'])
+      return bool(KomfoventStatus.read_state()['active'])
 
   def set_active_state(active):
-    state_active = int(KomfoventStatus.read_state()['active'])
+    state_active = bool(KomfoventStatus.read_state()['active'])
 
     try:
       r = requests.get(PING2_URL+"/a1.html", data={'0001': USERNAME, '0002': PASSWORD, '0003': '1'})
       if r.status_code == 200:
-        KomfoventStatus.update_state({'active': active})
+        KomfoventStatus.update_state({'active': int(active)})
         return active
       else:
         return state_active
@@ -123,7 +123,7 @@ class KomfoventStatus():
       response = requests.get(PING2_URL+"/b1.html", data={'0001': USERNAME, '0002': PASSWORD})
       soup = BeautifulSoup(response.text, 'html.parser')
       current_speed = int(soup.find('input', attrs={'name': '0011'})['value'].rstrip())
-      KomfoventStatus.update_state({'speed': current_speed})
+      KomfoventStatus.update_state({'speed': int(current_speed)})
       return current_speed
     except:
       return int(KomfoventStatus.read_state()['speed'])
@@ -133,7 +133,7 @@ class KomfoventStatus():
     try:
       r = requests.post(PING2_URL+"/speed", data={'0001': USERNAME, '0002': PASSWORD, DOMEKT_MODE2_IN: speed, DOMEKT_MODE2_EX: speed})
       if r.status_code == 200:
-        KomfoventStatus.update_state({'speed': speed})
+        KomfoventStatus.update_state({'speed': int(speed)})
         return int(speed)
       else:
         return state_speed
@@ -199,8 +199,8 @@ def settings():
       KomfoventStatus.set_fan_speed(last_speed)
 
   if llen_active > 0 :
-    last_active = int(R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)[-1])
-    if last_active != int(current_state['active']):
+    last_active = bool((R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)[-1]))
+    if last_active != bool(current_state['active']):
       KomfoventStatus.set_active_state(last_active)
 
 def run_httpserver():
