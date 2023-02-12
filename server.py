@@ -48,19 +48,15 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     state = KomfoventStatus.read_state()
     now = int(time.time())
-    print("now:", now)
-    print(state)
-    print("state time:", state['time'])
-    print("POLLING:", POLLING)
-    print("time difference:", now - int(state['time']))
+
     if (now - int(state['time'])) > POLLING:
       print("getting fresh info")
       response["speed"] = KomfoventStatus.get_fan_speed()
       response["active"] = KomfoventStatus.get_power_state()
     else:
-      print("getting info from state file")
-      response["speed"] = state['speed']
-      response["active"] = state['active']
+      print("getting info from state")
+      response["speed"] = int(state['speed'])
+      response["active"] = int(state['active'])
 
     self.send_response(response_code)
     self.send_header("Content-Type", "application/json")
