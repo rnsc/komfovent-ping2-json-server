@@ -167,8 +167,6 @@ class KomfoventStatus():
     data = {}
     try:
       data = R.hgetall(REDIS_KEY_STATUS)
-      if not data:
-        data = DEFAULT_DATA
     except:
       data = DEFAULT_DATA
       print(json.dumps(data))
