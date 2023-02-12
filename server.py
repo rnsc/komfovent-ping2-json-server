@@ -74,10 +74,10 @@ class ServerHandler(BaseHTTPRequestHandler):
       response_code = 200
 
       if 'speed' in json_payload:
-        R.lpush(REDIS_KEY_SETTINGS_SPEED_LIST, int(json_payload['speed']))
+        R.rpush(REDIS_KEY_SETTINGS_SPEED_LIST, int(json_payload['speed']))
         response['speed'] = json_payload['speed']
       if 'active' in json_payload:
-        R.lpush(REDIS_KEY_SETTINGS_ACTIVE_LIST, int(json_payload['active']))
+        R.rpush(REDIS_KEY_SETTINGS_ACTIVE_LIST, int(json_payload['active']))
         response["active"] = json_payload['active']
 
       self.send_response(response_code)
@@ -194,12 +194,16 @@ def settings():
   current_state = KomfoventStatus.read_state()
 
   if llen_speed > 0 :
-    last_speed = int(R.lpop(REDIS_KEY_SETTINGS_SPEED_LIST, llen_speed)[-1])
+    redis_speed_settings = R.lpop(REDIS_KEY_SETTINGS_SPEED_LIST, llen_speed)
+    last_speed = int(redis_speed_settings[-1])
+    print("last_speed: ", last_speed)
     if last_speed != int(current_state['speed']):
       KomfoventStatus.set_fan_speed(last_speed)
 
   if llen_active > 0 :
-    last_active = bool((R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)[-1]))
+    redis_active_settings = R.lpop(REDIS_KEY_SETTINGS_ACTIVE_LIST, llen_active)
+    last_active = bool((redis_active_settings[-1]))
+    print("last_active: ", last_active)
     if last_active != bool(current_state['active']):
       KomfoventStatus.set_active_state(last_active)
 
